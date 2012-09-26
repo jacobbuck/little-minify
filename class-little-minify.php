@@ -9,17 +9,18 @@ class Little_Minify {
 			'jpg'  => 'image/jpeg', 
 			'jpeg' => 'image/jpeg', 
 			'gif'  => 'image/gif', 
-			'png'  => 'image/png'
+			'png'  => 'image/png',
+			'ttf'  => 'font/truetype',
+			'otf'  => 'font/opentype',
+			'woff' => 'font/woff'
 		);
-	private $css_embedding_limit = 10240; // 10KB
+	private $css_embedding_limit = 51200; // 50KB
 	private $concat_delimiter = ',';
 	private $charset = 'utf-8';
 	
-	// Directories
+	// Misc
 	private $lib_dir;
 	private $cache_dir;
-	
-	// Misc
 	private $allowed_types = array( 
 			'css' => 'text/css', 
 			'js'  => 'application/javascript'
@@ -38,7 +39,7 @@ class Little_Minify {
 		$this->cache_dir = dirname( __FILE__ ) . '/cache';
 		
 		// Check if gzip available
-		$this->use_gzip = ( in_array( 'gzip', explode( ',', $_SERVER['HTTP_ACCEPT_ENCODING'] ) ) && function_exists('gzencode') );
+		$this->use_gzip = ( in_array( 'gzip', explode( ',', $_SERVER['HTTP_ACCEPT_ENCODING'] ) ) && extension_loaded('zlib') );
 		
 		// Start Minifying
 		
@@ -80,57 +81,61 @@ class Little_Minify {
 		if ( ! count( $file_paths ) )
 			$this->exit_404();
 		
-		// Generate cache file name
-		$cache_name = $this->cache_prefix . md5( implode( ':)', $file_paths ) ) . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
-		$cache_path = $this->cache_dir . '/' . $cache_name;
+		// Get the largest last modified time
+		$last_modified = max( $file_times );
+		
+		// Last modified header
+		header( 'Last-Modified: ' . gmdate( 'D, d M Y H:i:s', $last_modified ) . ' GMT' );
+		
+		// 304 not modified status header
+		if ( isset( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) && strtotime( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) === $last_modified ) { 
+		    header('HTTP/1.1 304 Not Modified'); 
+		    exit; 
+		}		
 				
-		// Expire in 24 hours
+		// Generate cache file name
+		$cache_name = $this->cache_prefix . md5( implode( ':)', $file_paths ) );
+		$cache_file = $this->cache_dir . '/' . $cache_name . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
+				
+		// Expire in 24 hours ( 60 * 60 * 24 )
 		header( 'Cache-Control: max-age=86400, must-revalidate' );
 		header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + 86400 ) . ' GMT' );
 		
-		// Content Type
+		// Content type header
 		header( 'Content-Type: ' . $this->allowed_types[ $file_type ] . '; charset=' . $this->charset );
 		
-		// Gzipped
-		if ( $this->use_gzip ) {
+		// Gzip encoding header
+		if ( $this->use_gzip ) 
 			header('Content-Encoding: gzip');
-		}
 		
 		// Check if cache exists and up to date
-		if ( file_exists( $cache_path ) && filemtime( $cache_path ) >= max( $file_times ) ) {
-			
-			// File size and last modified
-			header( 'Content-Length: ' . filesize( $cache_path ) );
-			header( 'Last-Modified: ' . filemtime( $cache_path ) );
-			
-			// Get minified from cache
-			readfile( $cache_path );
-			
-		} else {
-			
-			// Minify files and cache
-			$content = '';
-			foreach ( (array) $file_paths as $file_path ) {
-				$content .= file_get_contents( $file_path );
-			}
-			$content = $this->{ $file_type . '_minify' }( $content );
-			if ( $this->use_gzip ) {
-				$content = gzencode( $content, 9 );
-			}
-			if ( is_writable( $this->cache_dir ) ) {
-				file_put_contents( $cache_path, $content );
-			}
-		
-			// File size and last modified
-			header( 'Content-Length: ' . strlen( $content ) );
-			header( 'Last-Modified: ' . max( $file_times ) );
-			
-			// Output Minified
-			echo $content;
-			
+		if ( file_exists( $cache_file ) && filemtime( $cache_file ) > $last_modified ) {
+			// Output minified from cache
+			readfile( $cache_file );
+			exit;
 		}
 		
-		// We're done here
+		// Continue if not cached yet
+				
+		// Output and buffer files
+		ob_start();
+		foreach ( (array) $file_paths as $file_path ) 
+			readfile( $file_path );
+		$content = ob_get_clean();
+		
+		// Minify content
+		$content = $this->{ $file_type . '_minify' }( $content );
+		
+		// Gzip content
+		if ( $this->use_gzip ) 
+			$content = gzencode( $content, 9 );
+		
+		// Write to cache
+		if ( is_writable( $this->cache_dir ) ) 
+			file_put_contents( $cache_file, $content );
+		
+		// Output content
+		echo $content;
 		exit;
 		
 	}
@@ -140,12 +145,12 @@ class Little_Minify {
 	
 	private function css_minify ( $output ) {
 		require_once( $this->lib_dir . '/cssmin.php' );
-		$compressor = new CSSmin();
+		$compressor = new CSSmin;
 		return $compressor->run( $this->css_convert_urls( $output ) );
 	}
 		
 	private function css_convert_urls ( $output ) {	
-		return preg_replace_callback( '/url\s*\([\'"]?([^\)\'"]+)[\'"]?\)/', array( &$this, 'css_convert_urls_callback' ), $output );
+		return preg_replace_callback( '/url\([\'"]?([^\)\'"]+)[\'"]?\)/i', array( &$this, 'css_convert_urls_callback' ), $output );
 	}
 	
 	private function css_convert_urls_callback ( $matches ) {
@@ -158,26 +163,25 @@ class Little_Minify {
 		
 		$file_type = substr( $file_path, strrpos( $file_path, '.' ) + 1 );
 		
-		// Return base64 embeded if extension supported
-		if ( $this->css_embedding && isset( $this->css_embedding_types[ $file_type ] ) && filesize( $file_path ) < $this->css_embedding_limit )
+		// Return base64 embeded if allowed (based on file size and type)
+		if ( $this->css_embedding && isset( $this->css_embedding_types[ $file_type ] ) && ( ! $this->css_embedding_limit || filesize( $file_path ) < $this->css_embedding_limit ) )
 			return 'url(data:' . $this->css_embedding_types[ $file_type ] . ';base64,' . base64_encode( file_get_contents( $file_path ) ) . ')';
 		
-		// Return full absolute url
+		// Return absolute URL
 		return 'url(' . str_replace( $this->base_dir . '/', $this->base_url, $file_path ) . ')';
 		
 	}
 	
 	
-	// JS Minifier Functions 
+	// JS Minifier Function
 	
 	private function js_minify ( $output ) {
 		require_once( $this->lib_dir . '/jsminplus.php' );
-		$minified = JSMinPlus::minify( $output );
-		return $minified;
+		return JSMinPlus::minify( $output );
 	}
 	
 	 
-	// Exit with 404 status
+	// Exit with 404 status header
 	
 	private function exit_404 () {
 		header( $_SERVER['SERVER_PROTOCOL'] . ' 404 Not Found' ); 
