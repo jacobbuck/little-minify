@@ -3,7 +3,7 @@ class Little_Minify {
 	
 	// Config
 	private $base_dir = '../';
-	private $base_url = '/projects/little-minify/';
+	private $base_url = '/';
 	private $css_embedding = true;
 	private $css_embedding_types = array( 
 			'jpg'  => 'image/jpeg', 
@@ -31,11 +31,20 @@ class Little_Minify {
 	public function __construct () {		
 		
 		// Initialize
-		$this->init();
+		
+		// Set directory variables
+		$this->base_dir  = realpath( $this->base_dir );
+		$this->lib_dir   = dirname( __FILE__ ) . '/lib';
+		$this->cache_dir = dirname( __FILE__ ) . '/cache';
+		
+		// Check if gzip available
+		$this->use_gzip = ( in_array( 'gzip', explode( ',', $_SERVER['HTTP_ACCEPT_ENCODING'] ) ) && function_exists('gzencode') );
+		
+		// Start Minifying
 		
 		// Get the query string and clean it up
 		$query_string = urldecode( $_SERVER['QUERY_STRING'] );
-		$query_string = reset( explode( '?', $query_string ) ); // remove ?=junk
+		$query_string = reset( explode( '?', $query_string ) ); // remove any ?=junk
 		
 		// Split the base dir and files from query string
 		$this->current_dir = substr( $query_string, 0, strrpos( $query_string, '/' ) + 1 );
@@ -43,14 +52,14 @@ class Little_Minify {
 		
 		// 404 if no files
 		if ( ! $files )
-			return $this->output_404();
+			$this->exit_404();
 		
 		// Get file type
 		$file_type = substr( $files[0], strrpos( $files[0], '.' ) + 1 );
 		
-		// Check if file type allowed
+		// 404 if file type not allowed
 		if ( ! isset( $this->allowed_types[ $file_type ] ) )
-			return $this->output_404();
+			$this->exit_404();
 		
 		// Get an array of files to minify, and their last modified times
 		$file_paths = array();
@@ -59,7 +68,7 @@ class Little_Minify {
 			
 			$file_path = realpath( $this->base_dir . '/' . $this->current_dir . $file );
 			
-			if ( ! $file_path )
+			if ( ! $file_path ) // Skip if file can't be found
 				continue;
 			
 			array_push( $file_paths, $file_path );
@@ -69,18 +78,18 @@ class Little_Minify {
 		
 		// 404 if no real files
 		if ( ! count( $file_paths ) )
-			return $this->output_404();
+			$this->exit_404();
 		
 		// Generate cache file name
 		$cache_name = $this->cache_prefix . md5( $query_string ) . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
 		$cache_path = $this->cache_dir . '/' . $cache_name;
 				
 		// Expire in 24 hours
-		header('Cache-Control: max-age=86400, must-revalidate');
-		header('Expires: ' . gmdate('D, d M Y H:i:s', time() + 86400) . ' GMT');
+		header( 'Cache-Control: max-age=86400, must-revalidate' );
+		header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + 86400 ) . ' GMT' );
 		
 		// Content Type
-		header('Content-Type: ' . $this->allowed_types[ $file_type ] . '; charset=' . $this->charset);
+		header( 'Content-Type: ' . $this->allowed_types[ $file_type ] . '; charset=' . $this->charset );
 		
 		// Gzipped
 		if ( $this->use_gzip ) {
@@ -91,8 +100,8 @@ class Little_Minify {
 		if ( file_exists( $cache_path ) && filemtime( $cache_path ) >= max( $file_times ) ) {
 			
 			// File size and last modified
-			header('Content-Length: ' . filesize( $cache_path ));
-			header('Last-Modified: ' . filemtime( $cache_path ));
+			header( 'Content-Length: ' . filesize( $cache_path ) );
+			header( 'Last-Modified: ' . filemtime( $cache_path ) );
 			
 			// Get minified from cache
 			readfile( $cache_path );
@@ -113,8 +122,8 @@ class Little_Minify {
 			}
 		
 			// File size and last modified
-			header('Content-Length: ' . strlen( $content ));
-			header('Last-Modified: ' . max( $file_times ));
+			header( 'Content-Length: ' . strlen( $content ) );
+			header( 'Last-Modified: ' . max( $file_times ) );
 			
 			// Output Minified
 			echo $content;
@@ -124,31 +133,17 @@ class Little_Minify {
 		// We're done here
 		exit;
 		
-	}	
-	
-	private function init () {
-		
-		// Set directory variables
-		$this->base_dir  = realpath( $this->base_dir );
-		$this->lib_dir   = dirname( __FILE__ ) . '/lib';
-		$this->cache_dir = dirname( __FILE__ ) . '/cache';
-		
-		// Check if gzip available
-		$this->use_gzip = ( in_array( 'gzip', explode( ',', $_SERVER['HTTP_ACCEPT_ENCODING'] ) ) && function_exists('gzencode') );
-		
 	}
 	
 	
-	/* CSS Minifier Functions */
+	// CSS Minifier Functions
 	
 	private function css_minify ( $output ) {
 		require_once( $this->lib_dir . '/cssmin.php' );
 		$compressor = new CSSmin();
 		return $compressor->run( $this->css_convert_urls( $output ) );
 	}
-	
-	private $css_convert_urls_tmp_path = '';
-	
+		
 	private function css_convert_urls ( $output ) {	
 		return preg_replace_callback( '/url\s*\([\'"]?([^\)\'"]+)[\'"]?\)/', array( &$this, 'css_convert_urls_callback' ), $output );
 	}
@@ -172,7 +167,8 @@ class Little_Minify {
 		
 	}
 	
-	/* JS Minifier Functions */
+	
+	// JS Minifier Functions 
 	
 	private function js_minify ( $output ) {
 		require_once( $this->lib_dir . '/jsminplus.php' );
@@ -181,11 +177,12 @@ class Little_Minify {
 	}
 	
 	 
-	/* Output 404 */
+	// Exit with 404 status
 	
-	private function output_404 () {
+	private function exit_404 () {
 		header( $_SERVER['SERVER_PROTOCOL'] . ' 404 Not Found' ); 
 		exit;
 	}
+	
 	
 }
