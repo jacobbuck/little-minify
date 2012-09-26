@@ -2,10 +2,10 @@
 class Little_Minify {
 	
 	// Config
-	private $base_dir = '../';
-	private $base_url = '/';
-	private $css_embedding = true;
-	private $css_embedding_types = array( 
+	public $base_dir = '../';
+	public $base_url = '/';
+	public $css_embedding = true;
+	public $css_embedding_types = array( 
 			'jpg'  => 'image/jpeg', 
 			'jpeg' => 'image/jpeg', 
 			'gif'  => 'image/gif', 
@@ -14,9 +14,10 @@ class Little_Minify {
 			'otf'  => 'font/opentype',
 			'woff' => 'font/woff'
 		);
-	private $css_embedding_limit = 51200; // 50KB
-	private $concat_delimiter = ',';
-	private $charset = 'utf-8';
+	public $css_embedding_limit = 51200; // 50KB
+	public $concat_delimiter = ',';
+	public $charset = 'utf-8';
+	public $max_age = 86400; // 24 hours
 	
 	// Misc
 	private $lib_dir;
@@ -37,51 +38,63 @@ class Little_Minify {
 		$this->base_dir  = realpath( $this->base_dir );
 		$this->lib_dir   = dirname( __FILE__ ) . '/lib';
 		$this->cache_dir = dirname( __FILE__ ) . '/cache';
-		
+				
 		// Check if gzip available
-		$this->use_gzip = ( in_array( 'gzip', explode( ',', $_SERVER['HTTP_ACCEPT_ENCODING'] ) ) && extension_loaded('zlib') );
+		$this->use_gzip = ( strstr( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) && extension_loaded('zlib') );
 		
 		// Start Minifying
+		if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
+			
+			// Get the query string and clean it up
+			$query_string = urldecode( $_SERVER['QUERY_STRING'] );
+			$query_string = substr( $query_string, 0, strrpos( $query_string . '?', '?' ) );
+			
+			// Split the base dir and files from query string
+			$last_slash = strrpos( $query_string, '/' );
+			$dir = substr( $query_string, 0, $last_slash + 1 );
+			$files = explode( $this->concat_delimiter, substr( $query_string, $last_slash + 1 ) );
+			
+			// Add dir to all files
+			foreach ( $files as $key => $value )
+				$files[ $key ] = $dir . $value;
+			
+			// Minify files
+			$this->minify( $files );
+			
+			// 404 if error
+			header( $_SERVER['SERVER_PROTOCOL'] . ' 404 Not Found' ); 
+			exit;
+			
+		}
 		
-		// Get the query string and clean it up
-		$query_string = urldecode( $_SERVER['QUERY_STRING'] );
-		$query_string = reset( explode( '?', $query_string ) ); // remove any ?=junk
+	}
+	
+	// Minify Files
+	
+	public function minify ( $files ) {
+				
+		// Get files real path, check if they exist, and get their last modified times
+		$file_paths = array();
+		$file_times = array();
+		foreach ( (array) $files as $file ) {
+			if ( $file_path = realpath( $this->base_dir . '/' . $file ) ) { 
+				array_push( $file_paths, $file_path );
+				array_push( $file_times, filemtime( $file_path ) );
+			}
+		}
 		
-		// Split the base dir and files from query string
-		$this->current_dir = substr( $query_string, 0, strrpos( $query_string, '/' ) + 1 );
-		$files = explode( $this->concat_delimiter, substr( $query_string, strrpos( $query_string, '/' ) + 1 ) );
-		
-		// 404 if no files
-		if ( ! $files )
-			$this->exit_404();
+		// Return if no files
+		if ( count( $file_paths ) < 1 )
+			return false;
 		
 		// Get file type
 		$file_type = substr( $files[0], strrpos( $files[0], '.' ) + 1 );
 		
-		// 404 if file type not allowed
+		// Return if file type not allowed
 		if ( ! isset( $this->allowed_types[ $file_type ] ) )
-			$this->exit_404();
-		
-		// Get an array of files to minify, and their last modified times
-		$file_paths = array();
-		$file_times = array();
-		foreach ( (array) $files as $file ) {
-			
-			$file_path = realpath( $this->base_dir . '/' . $this->current_dir . $file );
-			
-			if ( ! $file_path ) // Skip if file can't be found
-				continue;
-			
-			array_push( $file_paths, $file_path );
-			array_push( $file_times, filemtime( $file_path ) );
-			
-		}
-		
-		// 404 if no real files
-		if ( ! count( $file_paths ) )
-			$this->exit_404();
-		
-		// Get the largest last modified time
+			return false;
+				
+		// Get the latest last modified time
 		$last_modified = max( $file_times );
 		
 		// Last modified header
@@ -89,17 +102,20 @@ class Little_Minify {
 		
 		// 304 not modified status header
 		if ( isset( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) && strtotime( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) === $last_modified ) { 
-		    header('HTTP/1.1 304 Not Modified'); 
-		    exit; 
-		}		
-				
+			header('HTTP/1.1 304 Not Modified'); 
+			exit; 
+		}
+		
 		// Generate cache file name
 		$cache_name = $this->cache_prefix . md5( implode( ':)', $file_paths ) );
 		$cache_file = $this->cache_dir . '/' . $cache_name . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
-				
-		// Expire in 24 hours ( 60 * 60 * 24 )
-		header( 'Cache-Control: max-age=86400, must-revalidate' );
-		header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + 86400 ) . ' GMT' );
+		
+		// Expires headers
+		if ( $this->max_age ) {
+			header( 'Cache-Control: max-age=' . $this->max_age . ', must-revalidate' );
+			header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + $this->max_age ) . ' GMT' )
+		} else 
+			header( 'Cache-Control: must-revalidate' );
 		
 		// Content type header
 		header( 'Content-Type: ' . $this->allowed_types[ $file_type ] . '; charset=' . $this->charset );
@@ -117,12 +133,22 @@ class Little_Minify {
 		
 		// Continue if not cached yet
 				
-		// Output and buffer files
-		ob_start();
-		foreach ( (array) $file_paths as $file_path ) 
-			readfile( $file_path );
-		$content = ob_get_clean();
-		
+		// Get content
+		$content = '';
+		foreach ( (array) $file_paths as $file_path ) {
+			// Get file contents
+			$file_contents = file_get_contents( $file_path );
+			if ( ! $file_contents ) // Skip if empty
+				continue;
+			// Get current file dir
+			$this->current_dir = dirname( $file_path );
+			// Convert URLs if CSS
+			if ( 'css' === $file_type )
+				$file_contents = $this->css_convert_urls( $file_contents );
+			// Append file contents
+			$content .= $file_contents;
+		}
+				
 		// Minify content
 		$content = $this->{ $file_type . '_minify' }( $content );
 		
@@ -146,7 +172,7 @@ class Little_Minify {
 	private function css_minify ( $output ) {
 		require_once( $this->lib_dir . '/cssmin.php' );
 		$compressor = new CSSmin;
-		return $compressor->run( $this->css_convert_urls( $output ) );
+		return $compressor->run( $output );
 	}
 		
 	private function css_convert_urls ( $output ) {	
@@ -155,8 +181,8 @@ class Little_Minify {
 	
 	private function css_convert_urls_callback ( $matches ) {
 		
-		$file_path = realpath( $this->base_dir . '/' . $this->current_dir . '/' . reset( explode( '?', $matches[1] ) ) );
-		
+		$file_path = realpath( $this->current_dir . '/' . substr( $matches[1], 0, strrpos( $matches[1] . '?', '?' ) ) );
+				
 		// Return existing URL if file can't be found
 		if ( ! $file_path )
 			return 'url(' . $matches[1] . ')';
@@ -179,14 +205,5 @@ class Little_Minify {
 		require_once( $this->lib_dir . '/jsminplus.php' );
 		return JSMinPlus::minify( $output );
 	}
-	
-	 
-	// Exit with 404 status header
-	
-	private function exit_404 () {
-		header( $_SERVER['SERVER_PROTOCOL'] . ' 404 Not Found' ); 
-		exit;
-	}
-	
-	
+		
 }
