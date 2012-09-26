@@ -113,7 +113,7 @@ class Little_Minify {
 		// Expires headers
 		if ( $this->max_age ) {
 			header( 'Cache-Control: max-age=' . $this->max_age . ', must-revalidate' );
-			header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + $this->max_age ) . ' GMT' )
+			header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + $this->max_age ) . ' GMT' );
 		} else 
 			header( 'Cache-Control: must-revalidate' );
 		
