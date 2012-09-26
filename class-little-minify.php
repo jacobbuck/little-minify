@@ -81,7 +81,7 @@ class Little_Minify {
 			$this->exit_404();
 		
 		// Generate cache file name
-		$cache_name = $this->cache_prefix . md5( $query_string ) . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
+		$cache_name = $this->cache_prefix . md5( implode( ':)', $file_paths ) ) . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
 		$cache_path = $this->cache_dir . '/' . $cache_name;
 				
 		// Expire in 24 hours
