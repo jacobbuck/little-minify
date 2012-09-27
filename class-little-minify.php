@@ -29,7 +29,6 @@ class Little_Minify {
 			'js'  => 'application/javascript'
 		);
 	private $cache_prefix = 'lm-';
-	private $current_dir;
 	private $use_gzip;
 	
 	public function __construct () {		
@@ -103,7 +102,7 @@ class Little_Minify {
 		header( 'Last-Modified: ' . gmdate( 'D, d M Y H:i:s', $last_modified ) . ' GMT' );
 		
 		// 304 not modified status header
-		if ( isset( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) && strtotime( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) === $last_modified ) { 
+		if ( @strtotime( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) === $last_modified ) { 
 			header('HTTP/1.1 304 Not Modified'); 
 			exit; 
 		}
@@ -126,7 +125,7 @@ class Little_Minify {
 			header('Content-Encoding: gzip');
 		
 		// Check if cache exists and up to date
-		if ( $this->{ 'cache_' . $this->server_cache . '_last_modified' }( $cache_name ) > $last_modified ) {
+		if ( $this->server_cache && $this->{ 'cache_' . $this->server_cache . '_last_modified' }( $cache_name ) > $last_modified ) {
 			// Output minified from cache
 			if ( $this->{ 'cache_' . $this->server_cache . '_output' }( $cache_name ) )
 				exit;
@@ -141,11 +140,9 @@ class Little_Minify {
 			$file_contents = file_get_contents( $file_path );
 			if ( ! $file_contents ) // Skip if empty
 				continue;
-			// Get current file dir
-			$this->current_dir = dirname( $file_path );
 			// Convert URLs if CSS
 			if ( 'css' === $file_type )
-				$file_contents = $this->css_convert_urls( $file_contents );
+				$file_contents = $this->css_convert_urls( $file_contents, dirname( $file_path ) );
 			// Append file contents
 			$content .= $file_contents;
 		}
@@ -158,7 +155,8 @@ class Little_Minify {
 			$content = gzencode( $content, 9 );
 		
 		// Write to cache
-		$this->{ 'cache_' . $this->server_cache . '_write' }( $cache_name, $content );
+		if ( $this->server_cache )
+			$this->{ 'cache_' . $this->server_cache . '_write' }( $cache_name, $content );
 		
 		// Output content
 		echo $content;
@@ -174,14 +172,19 @@ class Little_Minify {
 		$compressor = new CSSmin;
 		return $compressor->run( $output );
 	}
+	
+	private $css_convert_urls_tmp_dir;
+	private $css_convert_urls_tmp_output;
 		
-	public function css_convert_urls ( $output ) {	
+	public function css_convert_urls ( $output, $dir ) {	
+		$this->css_convert_urls_tmp_dir = $dir;
+		$this->css_convert_urls_tmp_output = $output;
 		return preg_replace_callback( '/url\([\'"]?([^\)\'"]+)[\'"]?\)/i', array( &$this, 'css_convert_urls_callback' ), $output );
 	}
 	
 	private function css_convert_urls_callback ( $matches ) {
 		
-		$file_path = realpath( $this->current_dir . '/' . substr( $matches[1], 0, strrpos( $matches[1] . '?', '?' ) ) );
+		$file_path = realpath( $this->css_convert_urls_tmp_output . '/' . substr( $matches[1], 0, strrpos( $matches[1] . '?', '?' ) ) );
 				
 		// Return existing URL if file can't be found
 		if ( ! $file_path )
@@ -190,7 +193,12 @@ class Little_Minify {
 		$file_type = substr( $file_path, strrpos( $file_path, '.' ) + 1 );
 		
 		// Return base64 embeded if allowed (based on file size and type)
-		if ( $this->css_embedding && isset( $this->css_embedding_types[ $file_type ] ) && ( ! $this->css_embedding_limit || filesize( $file_path ) < $this->css_embedding_limit ) )
+		if ( 
+			$this->css_embedding && 
+			isset( $this->css_embedding_types[ $file_type ] ) && 
+			substr_count( $this->css_convert_urls_tmp_output, $matches[1] ) < 2 &&
+			( ! $this->css_embedding_limit || filesize( $file_path ) < $this->css_embedding_limit ) 
+		)
 			return 'url(data:' . $this->css_embedding_types[ $file_type ] . ';base64,' . base64_encode( file_get_contents( $file_path ) ) . ')';
 		
 		// Return absolute URL
@@ -230,7 +238,7 @@ class Little_Minify {
 		// File
 	
 	private function cache_file_last_modified ( $name ) {
-		return filemtime( $this->cache_dir . '/' . $name );
+		return @filemtime( $this->cache_dir . '/' . $name );
 	}
 	
 	private function cache_file_output ( $name ) {
