@@ -50,12 +50,6 @@ class Little_Minify {
 		$this->lib_dir   = dirname( __FILE__ ) . '/lib';
 		$this->cache_dir = dirname( __FILE__ ) . '/cache';
 		
-		// Check if base64 available (ahem, not Internet Explorer 7 or less)
-		$this->use_base64 = ( $this->css_embedding && ! preg_match( '/MSIE [1-7]\.0/i', $_SERVER['HTTP_USER_AGENT'] ) );
-		
-		// Check if gzip available
-		$this->use_gzip = ( $this->gzip && strstr( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) && extension_loaded('zlib') );
-		
 		// Start Minifying
 		if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
 			
@@ -119,6 +113,12 @@ class Little_Minify {
 			header('HTTP/1.1 304 Not Modified');
 			exit;
 		}
+		
+		// Check if base64 available (ahem, not Internet Explorer 7 or less)
+		$this->use_base64 = ( $this->css_embedding && ! preg_match( '/MSIE [1-7]\.0/i', $_SERVER['HTTP_USER_AGENT'] ) );
+		
+		// Check if gzip available
+		$this->use_gzip = ( $this->gzip && strstr( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) && extension_loaded('zlib') );
 		
 		// Generate cache file name
 		$cache_name = $this->cache_prefix . md5( implode( ':)' , $file_paths ) . ( $this->use_base64 ? '-base64' : '' ) ) . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
