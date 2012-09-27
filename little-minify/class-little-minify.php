@@ -18,7 +18,7 @@ class Little_Minify {
 	public $concat_delimiter = ',';
 	public $charset = 'utf-8';
 	public $gzip = true;
-	public $max_age = 86400; // 24 hours
+	public $max_age = 86400;
 	public $server_cache = 'file'; // apc, file or xcache
 	
 	// Misc
@@ -31,9 +31,16 @@ class Little_Minify {
 	private $cache_prefix = 'lm-';
 	private $use_gzip;
 	
-	public function __construct () {
+	public function __construct ( $config = array() ) {
 		
 		// Initialize
+		
+		// Override custom options
+		foreach ( (array) $config as $key => $val ) {
+			if ( isset( $this->{ $key } ) )
+				$this->{ $key } = $val;
+		}
+		
 		
 		// Set directory variables
 		$this->base_dir  = realpath( $this->base_dir );
