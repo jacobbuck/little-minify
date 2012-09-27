@@ -17,7 +17,9 @@ class Little_Minify {
 	public $css_embedding_limit = 51200; // 50KB
 	public $concat_delimiter = ',';
 	public $charset = 'utf-8';
+	public $gzip = true;
 	public $max_age = 86400; // 24 hours
+	public $server_cache = 'file'; // apc, file or xcache
 	
 	// Misc
 	private $lib_dir;
@@ -40,7 +42,7 @@ class Little_Minify {
 		$this->cache_dir = dirname( __FILE__ ) . '/cache';
 				
 		// Check if gzip available
-		$this->use_gzip = ( strstr( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) && extension_loaded('zlib') );
+		$this->use_gzip = ( $this->gzip && strstr( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) && extension_loaded('zlib') );
 		
 		// Start Minifying
 		if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
@@ -107,8 +109,7 @@ class Little_Minify {
 		}
 		
 		// Generate cache file name
-		$cache_name = $this->cache_prefix . md5( implode( ':)', $file_paths ) );
-		$cache_file = $this->cache_dir . '/' . $cache_name . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
+		$cache_name = $this->cache_prefix . md5( implode( ':)', $file_paths ) ) . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
 		
 		// Expires headers
 		if ( $this->max_age ) {
@@ -125,10 +126,10 @@ class Little_Minify {
 			header('Content-Encoding: gzip');
 		
 		// Check if cache exists and up to date
-		if ( file_exists( $cache_file ) && filemtime( $cache_file ) > $last_modified ) {
+		if ( $this->{ 'cache_' . $this->server_cache . '_last_modified' }( $cache_name ) > $last_modified ) {
 			// Output minified from cache
-			readfile( $cache_file );
-			exit;
+			if ( $this->{ 'cache_' . $this->server_cache . '_output' }( $cache_name ) )
+				exit;
 		}
 		
 		// Continue if not cached yet
@@ -157,8 +158,7 @@ class Little_Minify {
 			$content = gzencode( $content, 9 );
 		
 		// Write to cache
-		if ( is_writable( $this->cache_dir ) ) 
-			file_put_contents( $cache_file, $content );
+		$this->{ 'cache_' . $this->server_cache . '_write' }( $cache_name, $content );
 		
 		// Output content
 		echo $content;
@@ -169,13 +169,13 @@ class Little_Minify {
 	
 	// CSS Minifier Functions
 	
-	private function css_minify ( $output ) {
+	public function css_minify ( $output ) {
 		require_once( $this->lib_dir . '/cssmin.php' );
 		$compressor = new CSSmin;
 		return $compressor->run( $output );
 	}
 		
-	private function css_convert_urls ( $output ) {	
+	public function css_convert_urls ( $output ) {	
 		return preg_replace_callback( '/url\([\'"]?([^\)\'"]+)[\'"]?\)/i', array( &$this, 'css_convert_urls_callback' ), $output );
 	}
 	
@@ -201,9 +201,66 @@ class Little_Minify {
 	
 	// JS Minifier Function
 	
-	private function js_minify ( $output ) {
+	public function js_minify ( $output ) {
 		require_once( $this->lib_dir . '/jsminplus.php' );
 		return JSMinPlus::minify( $output );
 	}
-		
+	
+	
+	// Cache Functions
+	
+		// APC
+	
+	private function cache_apc_last_modified ( $name ) {
+		return apc_fetch( $name . '-mtime' );
+	}
+	
+	private function cache_apc_output ( $name ) {
+		if ( $content = apc_fetch( $name ) ) {
+			echo $content;
+			return true;
+		}
+		return false;
+	}
+	
+	private function cache_apc_write ( $name, $content ) {
+		return apc_store( $name . '-mtime', time(), $this->max_age ) && apc_store( $name, $content, $this->max_age );
+	}
+	
+		// File
+	
+	private function cache_file_last_modified ( $name ) {
+		return filemtime( $this->cache_dir . '/' . $name );
+	}
+	
+	private function cache_file_output ( $name ) {
+		return readfile( $this->cache_dir . '/' . $name );
+	}
+	
+	private function cache_file_write ( $name, $content ) {
+		if ( is_writable( $this->cache_dir ) ) 
+			return file_put_contents( $this->cache_dir . '/' . $name, $content );
+		return false;
+	}
+	
+		// Xcache
+	
+	private function cache_xcache_last_modified ( $name ) {
+		return xcache_get( $name . '-mtime' );
+	}
+	
+	private function cache_xcache_output ( $name ) {
+		if ( $content = xcache_get( $name ) ) {
+			echo $content;
+			return true;
+		}
+		return false;
+	}
+	
+	private function cache_xcache_write ( $name, $content ) {
+		return xcache_set( $name . '-mtime', time(), $this->max_age ) && xcache_set( $name, $content, $this->max_age );
+	}
+	
+	
+	
 }
