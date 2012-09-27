@@ -15,6 +15,9 @@ class Little_Minify {
 			'woff' => 'font/woff'
 		);
 	public $css_embedding_limit = 51200; // 50KB
+	public $css_import = true;
+	public $css_import_bubbling = 2;
+	public $css_import_mediaqueries = true;
 	public $concat_delimiter = ',';
 	public $charset = 'utf-8';
 	public $gzip = true;
@@ -29,6 +32,7 @@ class Little_Minify {
 			'js'  => 'application/javascript'
 		);
 	private $cache_prefix = 'lm-';
+	private $use_base64;
 	private $use_gzip;
 	
 	public function __construct ( $config = array() ) {
@@ -41,11 +45,13 @@ class Little_Minify {
 				$this->{ $key } = $val;
 		}
 		
-		
 		// Set directory variables
 		$this->base_dir  = realpath( $this->base_dir );
 		$this->lib_dir   = dirname( __FILE__ ) . '/lib';
 		$this->cache_dir = dirname( __FILE__ ) . '/cache';
+		
+		// Check if base64 available (ahem, not Internet Explorer 7 or less)
+		$this->use_base64 = ( $this->css_embedding && ! preg_match( '/MSIE [1-7]\.0/i', $_SERVER['HTTP_USER_AGENT'] ) );
 		
 		// Check if gzip available
 		$this->use_gzip = ( $this->gzip && strstr( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) && extension_loaded('zlib') );
@@ -115,7 +121,7 @@ class Little_Minify {
 		}
 		
 		// Generate cache file name
-		$cache_name = $this->cache_prefix . md5( implode( ':)', $file_paths ) ) . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
+		$cache_name = $this->cache_prefix . md5( implode( ':)' , $file_paths ) . ( $this->use_base64 ? '-base64' : '' ) ) . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
 		
 		// Expires headers
 		if ( $this->max_age ) {
@@ -147,9 +153,13 @@ class Little_Minify {
 			$file_contents = file_get_contents( $file_path );
 			if ( ! $file_contents ) // Skip if empty
 				continue;
-			// Convert URLs if CSS
-			if ( 'css' === $file_type )
-				$file_contents = $this->css_convert_urls( $file_contents, dirname( $file_path ) );
+			// Process stylesheet contents 
+			if ( 'css' === $file_type ) {
+				$file_dirname  = dirname( $file_path );
+				if ( $this->css_import )
+					$file_contents = $this->css_bubble_import( $file_contents, $file_dirname );
+				$file_contents = $this->css_convert_urls( $file_contents, $file_dirname );
+			}
 			// Append file contents
 			$content .= $file_contents;
 		}
@@ -180,39 +190,71 @@ class Little_Minify {
 		return $compressor->run( $output );
 	}
 	
-	private $css_convert_urls_tmp_dir;
-	private $css_convert_urls_tmp_output;
-	
-	public function css_convert_urls ( $output, $dir ) {	
-		$this->css_convert_urls_tmp_dir = $dir;
-		$this->css_convert_urls_tmp_output = $output;
-		return preg_replace_callback( '/url\([\'"]?([^\)\'"]+)[\'"]?\)/i', array( &$this, 'css_convert_urls_callback' ), $output );
+	public function css_bubble_import ( $output, $file_dirname, $depth = 1 ) {
+		
+		// Find and loop all @import url(reset.css); and @import 'reset.css' media-queries;
+		$match_count = preg_match_all( '/@import\s*(url\()?[\'"]?([^\s\)\'";]*)[\'"]?\)?([^;]*);/i', $output, $matches );
+		
+		for ( $i = 0; $i < $match_count; $i++ ) {
+			
+			$new_file_path = realpath( $file_dirname . '/' . $matches[2][ $i ] );
+			
+			// Keep existing URL if file can't be found
+			if ( ! $new_file_path )
+				continue;
+			
+			// Get stylesheet contents and process
+			$new_file_contents = file_get_contents( $new_file_path );
+			$new_file_dirname  = dirname( $new_file_path );
+			if ( $depth < $this->css_import_bubbling )
+				$new_file_contents = $this->css_bubble_import( $new_file_contents, $new_file_dirname, $depth + 1 );
+			$new_file_contents = $this->css_convert_urls( $new_file_contents, $new_file_dirname );
+			
+			// Wrap media query if avaliable
+			if ( $this->css_import_mediaqueries && $matches[3][ $i ] )
+				$new_file_contents = '@media '. $matches[3][ $i ] . ' {' . $new_file_contents . '}';
+			
+			// Replace @import with contents
+			$output = str_replace( $matches[0][ $i ], $new_file_contents, $output );
+			
+		}
+			
+		return $output;
+		
 	}
-	
-	private function css_convert_urls_callback ( $matches ) {
+		
+	public function css_convert_urls ( $output, $file_dirname ) {
 		
 		// Split URL by ? or #
-		preg_match( '/([^\?|\#]*)(.*)/', $matches[1], $matches );
+		$match_count = preg_match_all( '/url\([\'"]?([^\)\'"\?\#]*)([^\)\'"]*)[\'"]?\)/', $output, $matches );
+				
+		for ( $i = 0; $i < $match_count; $i++ ) {
+						
+			$new_file_path = realpath( $file_dirname . '/' . $matches[1][ $i ] );
+			
+			// Don't replace URL if file can't be found
+			if ( ! $new_file_path )
+				continue;
+			
+			$new_file_type = substr( $new_file_path, strrpos( $new_file_path, '.' ) + 1 );
+			
+			// Check if base64 embededding allowed (based on settings, file size and type)
+			if (
+				$this->use_base64 &&
+				isset( $this->css_embedding_types[ $new_file_type ] ) &&
+				substr_count( $output, $matches[1][ $i ] ) < 2 &&
+				( ! $this->css_embedding_limit || filesize( $new_file_path ) < $this->css_embedding_limit )
+			) {
+				// Replace URL with Base64
+				$output = str_replace( $matches[0][ $i ], 'url(data:' . $this->css_embedding_types[ $new_file_type ] . ';base64,' . base64_encode( file_get_contents( $new_file_path ) ) . ')', $output );
+			} else {
+				// Otherwise replace URL with absolute URL
+				$output = str_replace( $matches[0][ $i ], 'url(' . str_replace( $this->base_dir . '/', $this->base_url, $new_file_path ) . $matches[2][ $i ] . ')', $output );
+			}
+			
+		}
 		
-		$file_path = realpath( $this->css_convert_urls_tmp_dir . '/' . $matches[1] );
-		
-		// Return existing URL if file can't be found
-		if ( ! $file_path )
-			return 'url(' . $matches[0] . ')';
-		
-		$file_type = substr( $file_path, strrpos( $file_path, '.' ) + 1 );
-		
-		// Return base64 embeded if allowed (based on file size and type)
-		if (
-			$this->css_embedding &&
-			isset( $this->css_embedding_types[ $file_type ] ) &&
-			substr_count( $this->css_convert_urls_tmp_output, $matches[1] ) < 2 &&
-			( ! $this->css_embedding_limit || filesize( $file_path ) < $this->css_embedding_limit )
-		)
-			return 'url(data:' . $this->css_embedding_types[ $file_type ] . ';base64,' . base64_encode( file_get_contents( $file_path ) ) . ')';
-		
-		// Return absolute URL
-		return 'url(' . str_replace( $this->base_dir . '/', $this->base_url, $file_path ) . $matches[2] . ')';
+		return $output;
 		
 	}
 	

@@ -9,12 +9,8 @@ An awesome little CSS and JS minifier written in PHP.
 - Client-size caching (HTTP 304 Not Modified, Expires and Cache-Control headers)
 - Gzip compression
 - Base64 embedding images and fonts in stylesheets, and ignores duplicates (ie. css sprites)
-- Uses [Tubal Martin's PHP port of the YUI CSS compressor](https://github.com/tubalmartin/YUI-CSS-compressor-PHP-port) and [JSMinPlus](http://crisp.tweakblogs.net/blog/cat/716).
-
-## To Do ##
-
-- Better debugging options
 - CSS @import bubbling
+- Uses [Tubal Martin's PHP port of the YUI CSS compressor](https://github.com/tubalmartin/YUI-CSS-compressor-PHP-port) and [JSMinPlus](http://crisp.tweakblogs.net/blog/cat/716).
 
 ## Requirements ##
 

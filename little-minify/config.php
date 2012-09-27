@@ -11,7 +11,7 @@ $config = array();
  * Base Site URL
  * eg. 'http://example.com/' or '/'
  */
-//$config['base_url'] = '/';
+// $config['base_url'] = '/';
 
 /**
  * Enable base64 embedding in stylesheets
@@ -38,6 +38,21 @@ $config = array();
 // $config['css_embedding_limit'] = 51200;
 
 /**
+ * Enable CSS @import bubbling
+ */
+// $config['css_import'] = true;
+
+/**
+ * CSS @import bubbling depth limit
+ */
+// $config['css_import_bubbling'] = 2;
+
+/**
+ * Wrap @media around imported CSS @import's with media queries
+ */
+// $config['css_import_mediaqueries'] = true;
+
+/**
  * Delimiter (seperator) of concatination in URLs
  */
 // $config['concat_delimiter'] = ',';
@@ -50,10 +65,11 @@ $config = array();
 /**
  * Enable gzip compression
  */
-// $config['gzip'] = true;
+//$config['gzip'] = true;
 
 /**
  * Maximum age of cache (in seconds)
+ * This is both client-side, and APC/Xcache server-side
  */
 // $config['cache_max_age'] = 86400;
 
