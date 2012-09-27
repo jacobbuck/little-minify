@@ -28,5 +28,6 @@ An awesome little CSS and JS minifier written in PHP.
 
 ## Usage ##
 
-Link (or rewrite) any css/js file from: '/your/css/file.css' to: '/little-minify/?/your/css/file.css'.
+Link (or rewrite) any css or js file from: '/your/css/file.css' to: '/little-minify/?/your/css/file.css'.
+
 You can also combine files in the same directory: '/little-minify/?/your/css/file1.css,file2.css,file3.css'.
