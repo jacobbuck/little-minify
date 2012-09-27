@@ -16,4 +16,7 @@ An awesome little CSS and JS minifier written in PHP.
 - Easier configuration and better debugging options
 - CSS @import bubbling
 - Detect embedding duplicate images (ie. css sprites)
-- More server-side caching options (Memcache, etc)
+
+## Requirements ##
+
+- PHP 5.2.1+ (with Zlib for Gzip compression)
