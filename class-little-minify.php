@@ -5,10 +5,10 @@ class Little_Minify {
 	public $base_dir = '../';
 	public $base_url = '/';
 	public $css_embedding = true;
-	public $css_embedding_types = array( 
-			'jpg'  => 'image/jpeg', 
-			'jpeg' => 'image/jpeg', 
-			'gif'  => 'image/gif', 
+	public $css_embedding_types = array(
+			'jpg'  => 'image/jpeg',
+			'jpeg' => 'image/jpeg',
+			'gif'  => 'image/gif',
 			'png'  => 'image/png',
 			'ttf'  => 'font/truetype',
 			'otf'  => 'font/opentype',
@@ -24,14 +24,14 @@ class Little_Minify {
 	// Misc
 	private $lib_dir;
 	private $cache_dir;
-	private $allowed_types = array( 
-			'css' => 'text/css', 
+	private $allowed_types = array(
+			'css' => 'text/css',
 			'js'  => 'application/javascript'
 		);
 	private $cache_prefix = 'lm-';
 	private $use_gzip;
 	
-	public function __construct () {		
+	public function __construct () {
 		
 		// Initialize
 		
@@ -39,7 +39,7 @@ class Little_Minify {
 		$this->base_dir  = realpath( $this->base_dir );
 		$this->lib_dir   = dirname( __FILE__ ) . '/lib';
 		$this->cache_dir = dirname( __FILE__ ) . '/cache';
-				
+		
 		// Check if gzip available
 		$this->use_gzip = ( $this->gzip && strstr( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) && extension_loaded('zlib') );
 		
@@ -48,7 +48,7 @@ class Little_Minify {
 			
 			// Get the query string and clean it up
 			$query_string = urldecode( $_SERVER['QUERY_STRING'] );
-			$query_string = substr( $query_string, 0, strrpos( $query_string . '?', '?' ) );
+			$query_string = substr( $query_string, 0, strpos( $query_string . '?', '?' ) );
 			
 			// Split the base dir and files from query string
 			$last_slash = strrpos( $query_string, '/' );
@@ -63,7 +63,7 @@ class Little_Minify {
 			$this->minify( $files );
 			
 			// 404 if error
-			header( $_SERVER['SERVER_PROTOCOL'] . ' 404 Not Found' ); 
+			header( $_SERVER['SERVER_PROTOCOL'] . ' 404 Not Found' );
 			exit;
 			
 		}
@@ -73,12 +73,12 @@ class Little_Minify {
 	// Minify Files
 	
 	public function minify ( $files ) {
-				
+		
 		// Get files real path, check if they exist, and get their last modified times
 		$file_paths = array();
 		$file_times = array();
 		foreach ( (array) $files as $file ) {
-			if ( $file_path = realpath( $this->base_dir . '/' . $file ) ) { 
+			if ( $file_path = realpath( $this->base_dir . '/' . $file ) ) {
 				array_push( $file_paths, $file_path );
 				array_push( $file_times, filemtime( $file_path ) );
 			}
@@ -94,7 +94,7 @@ class Little_Minify {
 		// Return if file type not allowed
 		if ( ! isset( $this->allowed_types[ $file_type ] ) )
 			return false;
-				
+		
 		// Get the latest last modified time
 		$last_modified = max( $file_times );
 		
@@ -102,9 +102,9 @@ class Little_Minify {
 		header( 'Last-Modified: ' . gmdate( 'D, d M Y H:i:s', $last_modified ) . ' GMT' );
 		
 		// 304 not modified status header
-		if ( @strtotime( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) === $last_modified ) { 
-			header('HTTP/1.1 304 Not Modified'); 
-			exit; 
+		if ( @strtotime( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) === $last_modified ) {
+			header('HTTP/1.1 304 Not Modified');
+			exit;
 		}
 		
 		// Generate cache file name
@@ -114,14 +114,14 @@ class Little_Minify {
 		if ( $this->max_age ) {
 			header( 'Cache-Control: max-age=' . $this->max_age . ', must-revalidate' );
 			header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + $this->max_age ) . ' GMT' );
-		} else 
+		} else
 			header( 'Cache-Control: must-revalidate' );
 		
 		// Content type header
 		header( 'Content-Type: ' . $this->allowed_types[ $file_type ] . '; charset=' . $this->charset );
 		
 		// Gzip encoding header
-		if ( $this->use_gzip ) 
+		if ( $this->use_gzip )
 			header('Content-Encoding: gzip');
 		
 		// Check if cache exists and up to date
@@ -132,7 +132,7 @@ class Little_Minify {
 		}
 		
 		// Continue if not cached yet
-				
+		
 		// Get content
 		$content = '';
 		foreach ( (array) $file_paths as $file_path ) {
@@ -146,12 +146,12 @@ class Little_Minify {
 			// Append file contents
 			$content .= $file_contents;
 		}
-				
+		
 		// Minify content
 		$content = $this->{ $file_type . '_minify' }( $content );
 		
 		// Gzip content
-		if ( $this->use_gzip ) 
+		if ( $this->use_gzip )
 			$content = gzencode( $content, 9 );
 		
 		// Write to cache
@@ -175,7 +175,7 @@ class Little_Minify {
 	
 	private $css_convert_urls_tmp_dir;
 	private $css_convert_urls_tmp_output;
-		
+	
 	public function css_convert_urls ( $output, $dir ) {	
 		$this->css_convert_urls_tmp_dir = $dir;
 		$this->css_convert_urls_tmp_output = $output;
@@ -184,25 +184,28 @@ class Little_Minify {
 	
 	private function css_convert_urls_callback ( $matches ) {
 		
-		$file_path = realpath( $this->css_convert_urls_tmp_output . '/' . substr( $matches[1], 0, strrpos( $matches[1] . '?', '?' ) ) );
-				
+		// Split URL by ? or #
+		preg_match( '/([^\?|\#]*)(.*)/', $matches[1], $matches );
+		
+		$file_path = realpath( $this->css_convert_urls_tmp_dir . '/' . $matches[1] );
+		
 		// Return existing URL if file can't be found
 		if ( ! $file_path )
-			return 'url(' . $matches[1] . ')';
+			return 'url(' . $matches[0] . ')';
 		
 		$file_type = substr( $file_path, strrpos( $file_path, '.' ) + 1 );
 		
 		// Return base64 embeded if allowed (based on file size and type)
-		if ( 
-			$this->css_embedding && 
-			isset( $this->css_embedding_types[ $file_type ] ) && 
+		if (
+			$this->css_embedding &&
+			isset( $this->css_embedding_types[ $file_type ] ) &&
 			substr_count( $this->css_convert_urls_tmp_output, $matches[1] ) < 2 &&
-			( ! $this->css_embedding_limit || filesize( $file_path ) < $this->css_embedding_limit ) 
+			( ! $this->css_embedding_limit || filesize( $file_path ) < $this->css_embedding_limit )
 		)
 			return 'url(data:' . $this->css_embedding_types[ $file_type ] . ';base64,' . base64_encode( file_get_contents( $file_path ) ) . ')';
 		
 		// Return absolute URL
-		return 'url(' . str_replace( $this->base_dir . '/', $this->base_url, $file_path ) . ')';
+		return 'url(' . str_replace( $this->base_dir . '/', $this->base_url, $file_path ) . $matches[2] . ')';
 		
 	}
 	
@@ -246,7 +249,7 @@ class Little_Minify {
 	}
 	
 	private function cache_file_write ( $name, $content ) {
-		if ( is_writable( $this->cache_dir ) ) 
+		if ( is_writable( $this->cache_dir ) )
 			return file_put_contents( $this->cache_dir . '/' . $name, $content );
 		return false;
 	}
@@ -268,7 +271,6 @@ class Little_Minify {
 	private function cache_xcache_write ( $name, $content ) {
 		return xcache_set( $name . '-mtime', time(), $this->max_age ) && xcache_set( $name, $content, $this->max_age );
 	}
-	
 	
 	
 }
