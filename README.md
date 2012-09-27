@@ -10,7 +10,7 @@ An awesome little CSS and JS minifier written in PHP.
 - Gzip compression
 - Base64 embedding images and fonts in stylesheets, and ignores duplicates (ie. css sprites)
 - CSS @import bubbling
-- Uses [Tubal Martin's PHP port of the YUI CSS compressor](https://github.com/tubalmartin/YUI-CSS-compressor-PHP-port) and [JSMinPlus](http://crisp.tweakblogs.net/blog/cat/716).
+- Uses PHP ports of the [YUI CSS compressor (by Túbal Martín)](https://github.com/tubalmartin/YUI-CSS-compressor-PHP-port) and [Douglas Crockford's JSMin (by Ryan Grove)](https://github.com/rgrove/jsmin-php).
 
 ## Requirements ##
 

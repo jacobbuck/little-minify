@@ -262,8 +262,8 @@ class Little_Minify {
 	// JS Minifier Function
 	
 	public function js_minify ( $output ) {
-		require_once( $this->lib_dir . '/jsminplus.php' );
-		return JSMinPlus::minify( $output );
+		require_once( $this->lib_dir . '/jsmin.php' );
+		return JSMin::minify( $output );
 	}
 	
 	
