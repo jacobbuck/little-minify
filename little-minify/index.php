@@ -1,11 +1,23 @@
 <?php
+/**
+ * Little Minify front end loader
+ * 
+ * @package Little_Minify
+ */
+
 require_once('class-little-minify.php');
 require_once('config.php');
 
 // Start Minifying
 if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
 	
-	$little_minify = new Little_Minify( $config );
+	$little_minify = new Little_Minify();
+	
+	// Configuration overrides
+	foreach ( (array) $config as $key => $val ) {
+		if ( isset( $little_minify->{ $key } ) )
+			$little_minify->{ $key } = $val;
+	}
 	
 	// Get the query string and clean it up
 	$query_string = urldecode( $_SERVER['QUERY_STRING'] );

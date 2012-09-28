@@ -1,4 +1,10 @@
 <?php
+/**
+ * Configuration file for Little Minify front end loader
+ * 
+ * @package Little_Minify
+ */
+
 $config = array();
 
 /**
@@ -27,6 +33,7 @@ $config = array();
 // 	'jpeg' => 'image/jpeg',
 // 	'gif'  => 'image/gif',
 // 	'png'  => 'image/png',
+// 	'webp' => 'image/webp',
 // 	'ttf'  => 'font/truetype',
 // 	'otf'  => 'font/opentype',
 // 	'woff' => 'font/woff'

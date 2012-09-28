@@ -1,4 +1,10 @@
 <?php
+/**
+ * Little_Minify class
+ * 
+ * @package Little_Minify
+ */
+
 class Little_Minify {
 	
 	// Configuration Variables
@@ -11,6 +17,7 @@ class Little_Minify {
 			'jpeg' => 'image/jpeg',
 			'gif'  => 'image/gif',
 			'png'  => 'image/png',
+			'webp' => 'image/webp',
 			'ttf'  => 'font/truetype',
 			'otf'  => 'font/opentype',
 			'woff' => 'font/woff'
@@ -41,14 +48,8 @@ class Little_Minify {
 	
 	// Initialize
 	
-	public function __construct ( $config = array() ) {
-		
-		// Configuration overrides
-		foreach ( (array) $config as $key => $val ) {
-			if ( isset( $this->{ $key } ) )
-				$this->{ $key } = $val;
-		}
-		
+	public function __construct () {
+				
 		// Set directory variables
 		$this->base_dir  = realpath( $this->base_dir );
 		$this->lib_dir   = dirname( __FILE__ ) . '/lib';
@@ -212,18 +213,19 @@ class Little_Minify {
 						
 			$new_file_path = realpath( $file_dirname . '/' . $matches[1][ $i ] );
 			
-			// Don't replace URL if file can't be found
+			// Don't replace URL if file path can't be found
 			if ( ! $new_file_path )
 				continue;
 			
 			$new_file_type = substr( $new_file_path, strrpos( $new_file_path, '.' ) + 1 );
 			
-			// Check if base64 embededding allowed (based on settings, file size and type)
+			// Check if base64 embededding allowed
 			if (
-				$this->use_base64 &&
-				isset( $this->css_embedding_types[ $new_file_type ] ) &&
-				substr_count( $output, $matches[1][ $i ] ) < 2 &&
-				( ! $this->css_embedding_limit || filesize( $new_file_path ) < $this->css_embedding_limit )
+				$this->use_base64 && // Embedding enabled and compatible
+				! $matches[2][ $i ] && // URL doesn't contain ? or #
+				isset( $this->css_embedding_types[ $new_file_type ] ) && // File type allowed
+				substr_count( $output, $matches[1][ $i ] ) < 2 && // URL isn't already used more than once
+				( ! $this->css_embedding_limit || filesize( $new_file_path ) < $this->css_embedding_limit ) // File under limit
 			) {
 				// Replace URL with Base64
 				$output = str_replace( $matches[0][ $i ], 'url(data:' . $this->css_embedding_types[ $new_file_type ] . ';base64,' . base64_encode( file_get_contents( $new_file_path ) ) . ')', $output );
