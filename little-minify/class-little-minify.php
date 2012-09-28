@@ -1,7 +1,8 @@
 <?php
 class Little_Minify {
 	
-	// Config
+	// Configuration Variables
+	
 	public $base_dir = '../';
 	public $base_url = '/';
 	public $css_embedding = true;
@@ -24,7 +25,9 @@ class Little_Minify {
 	public $max_age = 86400;
 	public $server_cache = 'file'; // apc, file or xcache
 	
-	// Misc
+	
+	// Misc Variables
+	
 	private $lib_dir;
 	private $cache_dir;
 	private $allowed_types = array(
@@ -35,11 +38,12 @@ class Little_Minify {
 	private $use_base64;
 	private $use_gzip;
 	
+	
+	// Initialize
+	
 	public function __construct ( $config = array() ) {
 		
-		// Initialize
-		
-		// Override custom options
+		// Configuration overrides
 		foreach ( (array) $config as $key => $val ) {
 			if ( isset( $this->{ $key } ) )
 				$this->{ $key } = $val;
@@ -50,32 +54,8 @@ class Little_Minify {
 		$this->lib_dir   = dirname( __FILE__ ) . '/lib';
 		$this->cache_dir = dirname( __FILE__ ) . '/cache';
 		
-		// Start Minifying
-		if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
-			
-			// Get the query string and clean it up
-			$query_string = urldecode( $_SERVER['QUERY_STRING'] );
-			$query_string = substr( $query_string, 0, strpos( $query_string . '?', '?' ) );
-			
-			// Split the base dir and files from query string
-			$last_slash = strrpos( $query_string, '/' );
-			$dir = substr( $query_string, 0, $last_slash + 1 );
-			$files = explode( $this->concat_delimiter, substr( $query_string, $last_slash + 1 ) );
-			
-			// Add dir to all files
-			foreach ( $files as $key => $value )
-				$files[ $key ] = $dir . $value;
-			
-			// Minify files
-			$this->minify( $files );
-			
-			// 404 if error
-			header( $_SERVER['SERVER_PROTOCOL'] . ' 404 Not Found' );
-			exit;
-			
-		}
-		
 	}
+	
 	
 	// Minify Files
 	
