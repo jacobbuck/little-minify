@@ -22,7 +22,7 @@ class Little_Minify {
 			'otf'  => 'font/opentype',
 			'woff' => 'font/woff'
 		);
-	public $css_embedding_limit = 51200; // 50KB
+	public $css_embedding_limit = 32768; // 32KB
 	public $css_import = true;
 	public $css_import_bubbling = 2;
 	public $css_import_mediaqueries = true;
@@ -35,15 +35,15 @@ class Little_Minify {
 	
 	// Misc Variables
 	
-	private $lib_dir;
-	private $cache_dir;
-	private $allowed_types = array(
+	protected $cache_dir;
+	protected $lib_dir;
+	protected $cache_prefix = 'lm-';
+	protected $minify_types = array(
 			'css' => 'text/css',
 			'js'  => 'application/javascript'
 		);
-	private $cache_prefix = 'lm-';
-	private $use_base64;
-	private $use_gzip;
+	protected $use_base64;
+	protected $use_gzip;
 	
 	
 	// Initialize
@@ -51,9 +51,8 @@ class Little_Minify {
 	public function __construct () {
 				
 		// Set directory variables
-		$this->base_dir  = realpath( $this->base_dir );
-		$this->lib_dir   = dirname( __FILE__ ) . '/lib';
 		$this->cache_dir = dirname( __FILE__ ) . '/cache';
+		$this->lib_dir   = dirname( __FILE__ ) . '/lib';
 		
 	}
 	
@@ -61,6 +60,9 @@ class Little_Minify {
 	// Minify Files
 	
 	public function minify ( $files ) {
+		
+		// Get real path of base dir
+		$this->base_dir = realpath( $this->base_dir );
 		
 		// Get files real path, check if they exist, and get their last modified times
 		$file_paths = array();
@@ -80,7 +82,7 @@ class Little_Minify {
 		$file_type = substr( $files[0], strrpos( $files[0], '.' ) + 1 );
 		
 		// Return if file type not allowed
-		if ( ! isset( $this->allowed_types[ $file_type ] ) )
+		if ( ! isset( $this->minify_types[ $file_type ] ) )
 			return false;
 		
 		// Get the latest last modified time
@@ -96,7 +98,7 @@ class Little_Minify {
 		}
 		
 		// Check if base64 available (ahem, not Internet Explorer 7 or less)
-		$this->use_base64 = ( $this->css_embedding && ! preg_match( '/MSIE [1-7]/i', $_SERVER['HTTP_USER_AGENT'] ) );
+		$this->use_base64 = ( $this->css_embedding && ! preg_match( '/MSIE [0-7]\./i', $_SERVER['HTTP_USER_AGENT'] ) );
 		
 		// Check if gzip available
 		$this->use_gzip = ( $this->gzip && strstr( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) && extension_loaded('zlib') );
@@ -112,7 +114,7 @@ class Little_Minify {
 			header( 'Cache-Control: must-revalidate' );
 		
 		// Content type header
-		header( 'Content-Type: ' . $this->allowed_types[ $file_type ] . '; charset=' . $this->charset );
+		header( 'Content-Type: ' . $this->minify_types[ $file_type ] . '; charset=' . $this->charset );
 		
 		// Gzip encoding header
 		if ( $this->use_gzip )
@@ -253,11 +255,11 @@ class Little_Minify {
 	
 		// APC
 	
-	private function cache_apc_last_modified ( $name ) {
+	protected function cache_apc_last_modified ( $name ) {
 		return apc_fetch( $name . '-mtime' );
 	}
 	
-	private function cache_apc_output ( $name ) {
+	protected function cache_apc_output ( $name ) {
 		if ( $content = apc_fetch( $name ) ) {
 			echo $content;
 			return true;
@@ -265,21 +267,21 @@ class Little_Minify {
 		return false;
 	}
 	
-	private function cache_apc_write ( $name, $content ) {
+	protected function cache_apc_write ( $name, $content ) {
 		return apc_store( $name . '-mtime', time(), $this->max_age ) && apc_store( $name, $content, $this->max_age );
 	}
 	
 		// File
 	
-	private function cache_file_last_modified ( $name ) {
+	protected function cache_file_last_modified ( $name ) {
 		return @filemtime( $this->cache_dir . '/' . $name );
 	}
 	
-	private function cache_file_output ( $name ) {
+	protected function cache_file_output ( $name ) {
 		return readfile( $this->cache_dir . '/' . $name );
 	}
 	
-	private function cache_file_write ( $name, $content ) {
+	protected function cache_file_write ( $name, $content ) {
 		if ( is_writable( $this->cache_dir ) )
 			return file_put_contents( $this->cache_dir . '/' . $name, $content );
 		return false;
@@ -287,11 +289,11 @@ class Little_Minify {
 	
 		// Xcache
 	
-	private function cache_xcache_last_modified ( $name ) {
+	protected function cache_xcache_last_modified ( $name ) {
 		return xcache_get( $name . '-mtime' );
 	}
 	
-	private function cache_xcache_output ( $name ) {
+	protected function cache_xcache_output ( $name ) {
 		if ( $content = xcache_get( $name ) ) {
 			echo $content;
 			return true;
@@ -299,7 +301,7 @@ class Little_Minify {
 		return false;
 	}
 	
-	private function cache_xcache_write ( $name, $content ) {
+	protected function cache_xcache_write ( $name, $content ) {
 		return xcache_set( $name . '-mtime', time(), $this->max_age ) && xcache_set( $name, $content, $this->max_age );
 	}
 	

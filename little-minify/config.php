@@ -42,7 +42,7 @@ $config = array();
 /**
  * File limit of base64 embedding (in bytes)
  */
-// $config['css_embedding_limit'] = 51200;
+// $config['css_embedding_limit'] = 32768;
 
 /**
  * Enable CSS @import bubbling
