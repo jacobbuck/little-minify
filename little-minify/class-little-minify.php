@@ -26,7 +26,6 @@ class Little_Minify {
 	public $css_import = true;
 	public $css_import_bubbling = 2;
 	public $css_import_mediaqueries = true;
-	public $concat_delimiter = ',';
 	public $charset = 'utf-8';
 	public $gzip = true;
 	public $max_age = 86400;

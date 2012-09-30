@@ -60,11 +60,6 @@ $config = array();
 // $config['css_import_mediaqueries'] = true;
 
 /**
- * Delimiter (seperator) of concatination in URLs
- */
-// $config['concat_delimiter'] = ',';
-
-/**
  * Character set
  */
 // $config['charset'] = 'utf-8';
