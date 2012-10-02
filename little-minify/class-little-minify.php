@@ -2,7 +2,10 @@
 /**
  * Little_Minify class
  * 
- * @package Little_Minify
+ * @package    Little_Minify
+ * @copyright  Copyright (c) 2012 Jacob Buck (http://jacobbuck.co.nz)
+ * @license    https://github.com/jacobbuck/little-minify/blob/master/license.txt   MIT
+ * @link       https://github.com/jacobbuck/little-minify/
  */
 
 class Little_Minify {
@@ -211,10 +214,14 @@ class Little_Minify {
 		$match_count = preg_match_all( '/url\([\'"]?([^\)\'"\?\#]*)([^\)\'"]*)[\'"]?\)/', $output, $matches );
 				
 		for ( $i = 0; $i < $match_count; $i++ ) {
-						
+			
+			// Skip data URL's
+			if ( 'data:' === substr( $matches[1][ $i ], 0, 5 ) )
+				continue;
+			
 			$new_file_path = realpath( $file_dirname . '/' . $matches[1][ $i ] );
 			
-			// Don't replace URL if file path can't be found
+			// Skip if file path can't be found
 			if ( ! $new_file_path )
 				continue;
 			
@@ -228,10 +235,10 @@ class Little_Minify {
 				substr_count( $output, $matches[1][ $i ] ) < 2 && // URL isn't already used more than once
 				( ! $this->css_embedding_limit || filesize( $new_file_path ) < $this->css_embedding_limit ) // File under limit
 			) {
-				// Replace URL with Base64
+				// Replace with base64 data URL
 				$output = str_replace( $matches[0][ $i ], 'url(data:' . $this->css_embedding_types[ $new_file_type ] . ';base64,' . base64_encode( file_get_contents( $new_file_path ) ) . ')', $output );
 			} else {
-				// Otherwise replace URL with absolute URL
+				// Otherwise replace with absolute URL
 				$output = str_replace( $matches[0][ $i ], 'url(' . str_replace( $this->base_dir . '/', $this->base_url, $new_file_path ) . $matches[2][ $i ] . ')', $output );
 			}
 			

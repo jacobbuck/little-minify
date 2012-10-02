@@ -2,7 +2,10 @@
 /**
  * Little Minify front end loader
  * 
- * @package Little_Minify
+ * @package    Little_Minify
+ * @copyright  Copyright (c) 2012 Jacob Buck (http://jacobbuck.co.nz)
+ * @license    https://github.com/jacobbuck/little-minify/blob/master/license.txt   MIT
+ * @link       https://github.com/jacobbuck/little-minify/
  */
 
 require('class-little-minify.php');
