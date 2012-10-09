@@ -94,8 +94,8 @@ class Little_Minify {
 		header( 'Last-Modified: ' . gmdate( 'D, d M Y H:i:s', $last_modified ) . ' GMT' );
 		
 		// 304 not modified status header
-		if ( ! empty( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) && $last_modified === strtotime( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) ) {
-			header('HTTP/1.1 304 Not Modified');
+		if ( isset( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) && $last_modified === strtotime( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) ) {
+			header( 'HTTP/1.1 304 Not Modified' );
 			exit;
 		}
 		
@@ -103,7 +103,7 @@ class Little_Minify {
 		$this->use_base64 = ( $this->css_embedding && ! preg_match( '/MSIE [0-7]\./i', $_SERVER['HTTP_USER_AGENT'] ) );
 		
 		// Check if gzip available
-		$this->use_gzip = ( $this->gzip && strstr( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) && extension_loaded('zlib') );
+		$this->use_gzip = ( $this->gzip && strstr( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) && extension_loaded( 'zlib' ) );
 		
 		// Generate cache file name
 		$cache_name = $this->cache_prefix . md5( implode( ':)' , $file_paths ) . ( $this->use_base64 ? '-base64' : '' ) ) . '.' . $file_type . ( $this->use_gzip ? '.gz' : '' );
@@ -120,7 +120,7 @@ class Little_Minify {
 		
 		// Gzip encoding header
 		if ( $this->use_gzip )
-			header('Content-Encoding: gzip');
+			header( 'Content-Encoding: gzip' );
 		
 		// Check if cache exists and up to date
 		if ( $this->server_cache && $this->{ 'cache_' . $this->server_cache . '_last_modified' }( $cache_name ) > $last_modified ) {
@@ -178,7 +178,7 @@ class Little_Minify {
 	public function css_bubble_import ( $output, $file_dirname, $depth = 1 ) {
 		
 		// Find and loop all @import url(reset.css); and @import 'reset.css' media-queries;
-		$match_count = preg_match_all( '/@import\s*(url\()?[\'"]?([^\s\)\'";]*)[\'"]?\)?([^;]*);/i', $output, $matches );
+		$match_count = preg_match_all( '/@import\s+(url\()?[\'"]?([^\s\)\'";]*)[\'"]?\)?([^;]*);/i', $output, $matches );
 		
 		for ( $i = 0; $i < $match_count; $i++ ) {
 			
