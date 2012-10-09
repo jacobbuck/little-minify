@@ -94,7 +94,7 @@ class Little_Minify {
 		header( 'Last-Modified: ' . gmdate( 'D, d M Y H:i:s', $last_modified ) . ' GMT' );
 		
 		// 304 not modified status header
-		if ( @strtotime( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) === $last_modified ) {
+		if ( ! empty( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) && $last_modified === strtotime( $_SERVER['HTTP_IF_MODIFIED_SINCE'] ) ) {
 			header('HTTP/1.1 304 Not Modified');
 			exit;
 		}
@@ -211,7 +211,7 @@ class Little_Minify {
 	public function css_convert_urls ( $output, $file_dirname ) {
 		
 		// Split URL by ? or #
-		$match_count = preg_match_all( '/url\([\'"]?([^\)\'"\?\#]*)([^\)\'"]*)[\'"]?\)/', $output, $matches );
+		$match_count = preg_match_all( '/url\([\'"]?([^\)\'"\?\#]*)([^\)\'"]*)[\'"]?\)/i', $output, $matches );
 				
 		for ( $i = 0; $i < $match_count; $i++ ) {
 			
