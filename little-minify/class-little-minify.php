@@ -99,8 +99,8 @@ class Little_Minify {
 			exit;
 		}
 		
-		// Check if base64 available (ahem, not Internet Explorer 7 or less)
-		$this->use_base64 = ( $this->css_embedding && ! preg_match( '/MSIE [0-7]\./i', $_SERVER['HTTP_USER_AGENT'] ) );
+		// Check if base64 available (ahem, not Internet Explorer 8 or less)
+		$this->use_base64 = ( $this->css_embedding && ! preg_match( '/MSIE [0-8]\./i', $_SERVER['HTTP_USER_AGENT'] ) );
 		
 		// Check if gzip available
 		$this->use_gzip = ( $this->gzip && strstr( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) && extension_loaded( 'zlib' ) );
